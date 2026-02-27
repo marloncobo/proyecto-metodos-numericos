@@ -15,7 +15,7 @@ Implementación de 5 métodos numéricos para resolución de ecuaciones no linea
 ## Instalación y Ejecución
 1. Clona el repositorio y navega a la carpeta del proyecto.
 ```bash
-    git clone <url-del-repositorio>
+    git clone https://github.com/marloncobo/proyecto-metodos-numericos.git
     cd proyecto_metodos_numericos
 ```
 2. Instala las dependencias necesarias:
