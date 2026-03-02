@@ -10,8 +10,8 @@ import numpy as np
 from funciones.definiciones import FUNCIONES
 from metodos.biseccion import biseccion
 from metodos.falsa_posicion import falsa_posicion, comparar_biseccion_falsa_posicion
-from metodos.punto_fijo import punto_fijo
-from metodos.newton import newton_raphson
+from metodos.punto_fijo import punto_fijo, punto_fijo_multiple_inicial
+from metodos.newton import newton_raphson, newton_multiple_inicial
 from metodos.secante import secante, comparar_newton_secante
 from utils.validaciones import *
 from utils.parser import procesar_funcion_personalizada
@@ -393,6 +393,10 @@ class MetodosNumericosGUI:
         self.mostrar_resultados_punto_fijo(resultado)
         self.graficar_punto_fijo(g, x0, resultado)
         self._mostrar_analisis(resultado, func_info)
+        
+        # --- AÑADIDO: Análisis de Sensibilidad (Ejercicio 3) ---
+        if messagebox.askyesno("Análisis de Sensibilidad", "¿Desea comparar diferentes valores iniciales (0.5, 1.0, 1.5, 2.0)?"):
+            self.comparar_punto_fijo_ui(g, g_derivada, tol)
     
     def ejecutar_newton(self, func_info, tol, max_iter):
         x0_valida, x0, _ = validar_valor_inicial(self.x0_entry.get(), "x0")
@@ -411,8 +415,12 @@ class MetodosNumericosGUI:
         self.graficar_newton(f, x0, resultado)
         self._mostrar_analisis(resultado, func_info)
         
+        # --- AÑADIDO: Análisis de Sensibilidad (Ejercicio 4) ---
+        if messagebox.askyesno("Análisis de Sensibilidad", "¿Desea comparar diferentes valores iniciales (1.0, 2.0, 3.0, 5.0)?"):
+            self.comparar_newton_iniciales_ui(f, f_derivada, tol)
+        
         # --- AÑADIDO: Comparación con Secante ---
-        if messagebox.askyesno("Comparar", "¿Comparar con método de la Secante?"):
+        elif messagebox.askyesno("Comparar", "¿Comparar con método de la Secante?"):
             # Asumimos un x1 cercano para la secante ya que no se pide en la entrada de Newton
             x1_estimado = x0 + 0.1
             self.comparar_newton_secante_ui(f, f_derivada, x0, x0, x1_estimado, tol)
@@ -810,6 +818,22 @@ class MetodosNumericosGUI:
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
+    def _crear_texto_con_scroll(self, parent, text_content):
+        """Crea un widget de texto con scrollbar vertical"""
+        frame = ttk.Frame(parent)
+        frame.pack(fill=tk.BOTH, expand=True, pady=5)
+
+        scrollbar = ttk.Scrollbar(frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        txt = tk.Text(frame, height=4, wrap=tk.WORD, font=FONT_MAIN,
+                      yscrollcommand=scrollbar.set, relief="flat", bg=COLOR_BG)
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=txt.yview)
+
+        txt.insert(tk.END, text_content)
+        txt.config(state=tk.DISABLED)
+
     def comparar_biseccion_falsa(self, f, a, b, tol, max_iter):
         comparacion = comparar_biseccion_falsa_posicion(f, a, b, tol)
         
@@ -820,6 +844,24 @@ class MetodosNumericosGUI:
         # Título
         ttk.Label(self.comparacion_frame, text="Comparativa de Rendimiento", style="Header.TLabel").pack(pady=10)
         
+        # Análisis de texto (MOVER ARRIBA)
+        analisis_frame = ttk.LabelFrame(self.comparacion_frame, text="Análisis de Convergencia", padding=15)
+        analisis_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=10)
+        
+        comp = comparacion['comparacion']
+        metodo_rapido = "Falsa Posición" if comp['metodo_mas_rapido'] == 'falsa_posicion' else "Bisección"
+        iter_diff = abs(comp['iteraciones_biseccion'] - comp['iteraciones_falsa'])
+        
+        texto_analisis = (
+            f"El método de {metodo_rapido} convergió más rápido.\n\n"
+            f"Diferencia en iteraciones: {iter_diff}\n"
+            "Análisis: El método de Falsa Posición suele ser más rápido que Bisección porque utiliza la magnitud de los valores de la función "
+            "para estimar la raíz (interpolación lineal), en lugar de simplemente dividir el intervalo a la mitad. "
+            "Esto le permite acercarse a la raíz con pasos más grandes cuando la función es suave."
+        )
+        
+        self._crear_texto_con_scroll(analisis_frame, texto_analisis)
+
         # Tabla
         columns = ('Método', 'Iteraciones', 'Raíz Encontrada', 'Tiempo (s)', 'Error final')
         tree = self._crear_tabla(columns) # Usar helper pero necesitamos re-packearlo en este frame
@@ -839,24 +881,6 @@ class MetodosNumericosGUI:
         
         tree.insert('', tk.END, values=('Bisección', bisec['iteraciones_totales'], f"{bisec['raiz']:.8f}", f"{bisec['tiempo_ejecucion']:.6f}", f"{bisec['error_final']:.2e}"))
         tree.insert('', tk.END, values=('Falsa Posición', falsa['iteraciones_totales'], f"{falsa['raiz']:.8f}", f"{falsa['tiempo_ejecucion']:.6f}", f"{falsa['error_final']:.2e}"))
-        
-        # Análisis de texto
-        analisis_frame = ttk.LabelFrame(self.comparacion_frame, text="Análisis de Convergencia", padding=15)
-        analisis_frame.pack(fill=tk.X, pady=10)
-        
-        comp = comparacion['comparacion']
-        metodo_rapido = "Falsa Posición" if comp['metodo_mas_rapido'] == 'falsa_posicion' else "Bisección"
-        iter_diff = abs(comp['iteraciones_biseccion'] - comp['iteraciones_falsa'])
-        
-        texto_analisis = (
-            f"El método de {metodo_rapido} convergió más rápido.\n\n"
-            f"Diferencia en iteraciones: {iter_diff}\n"
-            "Análisis: El método de Falsa Posición suele ser más rápido que Bisección porque utiliza la magnitud de los valores de la función "
-            "para estimar la raíz (interpolación lineal), en lugar de simplemente dividir el intervalo a la mitad. "
-            "Esto le permite acercarse a la raíz con pasos más grandes cuando la función es suave."
-        )
-        
-        ttk.Label(analisis_frame, text=texto_analisis, wraplength=800).pack(anchor=tk.W)
 
         # Gráfica comparativa
         fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
@@ -882,6 +906,25 @@ class MetodosNumericosGUI:
             
         ttk.Label(self.comparacion_frame, text="Newton-Raphson vs Secante", style="Header.TLabel").pack(pady=10)
         
+        # Análisis de texto (MOVER ARRIBA)
+        analisis_frame = ttk.LabelFrame(self.comparacion_frame, text="Análisis de Costo-Beneficio", padding=15)
+        analisis_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=10)
+        
+        comp = comparacion['comparacion']
+        metodo_rapido = "Newton-Raphson" if comp['metodo_mas_rapido'] == 'newton' else "Secante"
+        metodo_menos_eval = "Newton-Raphson" if comp['metodo_menos_evaluaciones'] == 'newton' else "Secante"
+        
+        texto_analisis = (
+            f"Método más rápido en tiempo: {metodo_rapido}\n"
+            f"Método con menos evaluaciones de función: {metodo_menos_eval}\n\n"
+            "Análisis: Newton-Raphson tiene convergencia cuadrática (más rápida por iteración) pero requiere calcular la derivada analítica, "
+            "lo cual puede ser costoso o difícil. El método de la Secante tiene convergencia superlineal (ligeramente más lenta) "
+            "pero no requiere derivada explícita. \n\n"
+            "Conclusión: Si la derivada es difícil de obtener, la Secante es preferible ya que ofrece un excelente equilibrio entre velocidad y simplicidad."
+        )
+        
+        self._crear_texto_con_scroll(analisis_frame, texto_analisis)
+
         columns = ('Método', 'Iteraciones', 'Evaluaciones', 'Tiempo (s)', 'Error final')
         frame_tabla = ttk.Frame(self.comparacion_frame, style="Card.TFrame")
         frame_tabla.pack(fill=tk.X, pady=10)
@@ -894,7 +937,6 @@ class MetodosNumericosGUI:
         
         newton = comparacion['newton']
         sec = comparacion['secante']
-        comp = comparacion['comparacion']
         
         tree.insert('', tk.END, values=('Newton', comp['iteraciones_newton'], comp['evaluaciones_newton'], f"{comp['tiempo_newton']:.6f}", f"{newton['error_final']:.2e}"))
         tree.insert('', tk.END, values=('Secante', comp['iteraciones_secante'], comp['evaluaciones_secante'], f"{comp['tiempo_secante']:.6f}", f"{sec['error_final']:.2e}"))
@@ -909,6 +951,140 @@ class MetodosNumericosGUI:
         ax.semilogy(range(1, len(errores_secante) + 1), errores_secante, label='Secante', marker='s')
         ax.legend()
         ax.set_title('Convergencia del Error')
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.comparacion_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=10)
+
+    def comparar_punto_fijo_ui(self, g, g_derivada, tol):
+        """Realiza el análisis de sensibilidad para Punto Fijo"""
+        valores_iniciales = [0.5, 1.0, 1.5, 2.0]
+        resultados = punto_fijo_multiple_inicial(g, valores_iniciales, g_derivada, tol)
+        
+        # Limpiar frame
+        for widget in self.comparacion_frame.winfo_children():
+            widget.destroy()
+            
+        ttk.Label(self.comparacion_frame, text="Análisis de Sensibilidad (Punto Fijo)", style="Header.TLabel").pack(pady=10)
+        
+        # Análisis de texto (MOVER ARRIBA)
+        analisis_frame = ttk.LabelFrame(self.comparacion_frame, text="Conclusión del Análisis", padding=15)
+        analisis_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=10)
+        
+        texto = (
+            "Análisis: El valor inicial afecta directamente el número de iteraciones necesarias para alcanzar la tolerancia. "
+            "Valores iniciales más cercanos a la raíz verdadera convergen más rápido. "
+            "Si el valor inicial está muy lejos o en una región donde |g'(x)| >= 1, el método podría diverger o converger muy lentamente."
+        )
+        self._crear_texto_con_scroll(analisis_frame, texto)
+
+        # Tabla
+        columns = ('x0', 'Iteraciones', 'Raíz Encontrada', 'Convergió')
+        frame_tabla = ttk.Frame(self.comparacion_frame, style="Card.TFrame")
+        frame_tabla.pack(fill=tk.X, pady=10)
+        
+        tree = ttk.Treeview(frame_tabla, columns=columns, show='headings', height=5)
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=120, anchor=tk.CENTER)
+        tree.pack(fill=tk.X)
+        
+        # Gráfica
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
+        self._configurar_grafica(fig, [ax])
+        
+        colores = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f']
+        
+        for i, x0 in enumerate(valores_iniciales):
+            key = f"x0_{x0}"
+            res = resultados[key]
+            
+            raiz_str = f"{res['raiz']:.8f}" if res['raiz'] else "N/A"
+            conv_str = "Sí" if res['convergio'] else "No"
+            
+            tree.insert('', tk.END, values=(x0, res['iteraciones_totales'], raiz_str, conv_str))
+            
+            if res['iteraciones']:
+                errores = [it['error_abs'] for it in res['iteraciones']]
+                ax.semilogy(range(1, len(errores) + 1), errores, label=f'x0={x0}', marker='o', color=colores[i % len(colores)])
+
+        ax.legend()
+        ax.set_title('Convergencia según Valor Inicial')
+        ax.set_xlabel('Iteración')
+        ax.set_ylabel('Error Absoluto (log)')
+        
+        canvas = FigureCanvasTkAgg(fig, master=self.comparacion_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=10)
+
+    def comparar_newton_iniciales_ui(self, f, f_derivada, tol):
+        """Realiza el análisis de sensibilidad para Newton-Raphson"""
+        valores_iniciales = [1.0, 2.0, 3.0, 5.0]
+        resultados = newton_multiple_inicial(f, f_derivada, valores_iniciales, tol)
+        
+        # Limpiar frame
+        for widget in self.comparacion_frame.winfo_children():
+            widget.destroy()
+            
+        ttk.Label(self.comparacion_frame, text="Análisis de Sensibilidad (Newton-Raphson)", style="Header.TLabel").pack(pady=10)
+        
+        # Análisis de texto (MOVER ARRIBA)
+        analisis_frame = ttk.LabelFrame(self.comparacion_frame, text="Conclusión del Análisis", padding=15)
+        analisis_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=10)
+        
+        mejor_x0 = None
+        min_iter = float('inf')
+        
+        # Pre-calcular mejor x0 para el texto
+        for x0 in valores_iniciales:
+            res = resultados[f"x0_{x0}"]
+            if res['convergio'] and res['iteraciones_totales'] < min_iter:
+                min_iter = res['iteraciones_totales']
+                mejor_x0 = x0
+
+        texto = (
+            f"El valor inicial que convergió más rápido fue x0 = {mejor_x0} con {min_iter} iteraciones.\n\n"
+            "Análisis: El método de Newton-Raphson es muy sensible al valor inicial. "
+            "Aunque su convergencia es cuadrática (muy rápida) cerca de la raíz, si el punto inicial está lejos "
+            "o cerca de un punto donde la derivada es cero (punto crítico), puede diverger o converger lentamente. "
+            "En este caso, se observa cómo la elección de x0 afecta drásticamente el número de iteraciones."
+        )
+        self._crear_texto_con_scroll(analisis_frame, texto)
+
+        # Tabla
+        columns = ('x0', 'Iteraciones', 'Raíz Encontrada', 'Convergió')
+        frame_tabla = ttk.Frame(self.comparacion_frame, style="Card.TFrame")
+        frame_tabla.pack(fill=tk.X, pady=10)
+        
+        tree = ttk.Treeview(frame_tabla, columns=columns, show='headings', height=5)
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=120, anchor=tk.CENTER)
+        tree.pack(fill=tk.X)
+        
+        # Gráfica
+        fig, ax = plt.subplots(figsize=(8, 4), dpi=100)
+        self._configurar_grafica(fig, [ax])
+        
+        colores = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f']
+        
+        for i, x0 in enumerate(valores_iniciales):
+            key = f"x0_{x0}"
+            res = resultados[key]
+            
+            raiz_str = f"{res['raiz']:.8f}" if res['raiz'] else "N/A"
+            conv_str = "Sí" if res['convergio'] else "No"
+            
+            tree.insert('', tk.END, values=(x0, res['iteraciones_totales'], raiz_str, conv_str))
+            
+            if res['iteraciones']:
+                errores = [it['error_abs'] for it in res['iteraciones']]
+                ax.semilogy(range(1, len(errores) + 1), errores, label=f'x0={x0}', marker='o', color=colores[i % len(colores)])
+
+        ax.legend()
+        ax.set_title('Convergencia según Valor Inicial')
+        ax.set_xlabel('Iteración')
+        ax.set_ylabel('Error Absoluto (log)')
         
         canvas = FigureCanvasTkAgg(fig, master=self.comparacion_frame)
         canvas.draw()
