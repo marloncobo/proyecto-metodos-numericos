@@ -472,7 +472,7 @@ class MetodosNumericosGUI:
     def _mostrar_resumen(self, resultado, extra_info=None):
         """Muestra el panel de resumen estilizado"""
         resumen_frame = ttk.LabelFrame(self.resultados_frame, text="Resumen de Ejecución", padding=15)
-        resumen_frame.pack(fill=tk.X, pady=20)
+        resumen_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=20, padx=10)
         
         # Grid para organizar info
         grid_frame = ttk.Frame(resumen_frame)
@@ -494,7 +494,7 @@ class MetodosNumericosGUI:
         lbl_status.pack(anchor=tk.E, pady=5)
         
         if extra_info:
-            ttk.Label(resumen_frame, text=extra_info, foreground="gray").pack(anchor=tk.W, pady=5)
+            ttk.Label(resumen_frame, text=extra_info, foreground="gray", wraplength=800).pack(anchor=tk.W, pady=5)
 
     def _mostrar_analisis(self, resultado, func_info):
         """Muestra la interpretación y análisis del resultado"""
@@ -539,6 +539,8 @@ class MetodosNumericosGUI:
         txt_conclusion.pack(fill=tk.X)
 
     def mostrar_resultados_biseccion(self, resultado):
+        self._mostrar_resumen(resultado)
+        
         columns = ('n', 'a', 'b', 'c', 'f(c)', 'error_abs', 'error_rel')
         tree = self._crear_tabla(columns)
         
@@ -554,10 +556,10 @@ class MetodosNumericosGUI:
                 f"{it['a']:.8f}", f"{it['b']:.8f}", f"{it['c']:.8f}",
                 f"{it['f(c)']:.8e}", f"{it['error_abs']:.8e}", f"{it['error_rel']:.8e}"
             ), tags=(tag,))
-            
-        self._mostrar_resumen(resultado)
 
     def mostrar_resultados_falsa_posicion(self, resultado):
+        self._mostrar_resumen(resultado)
+        
         columns = ('n', 'a', 'b', 'c', 'f(c)', 'error_abs', 'error_rel')
         tree = self._crear_tabla(columns)
         
@@ -573,10 +575,10 @@ class MetodosNumericosGUI:
                 f"{it['a']:.8f}", f"{it['b']:.8f}", f"{it['c']:.8f}",
                 f"{it['f(c)']:.8e}", f"{it['error_abs']:.8e}", f"{it['error_rel']:.8e}"
             ), tags=(tag,))
-            
-        self._mostrar_resumen(resultado)
 
     def mostrar_resultados_punto_fijo(self, resultado):
+        self._mostrar_resumen(resultado, resultado.get('mensaje', ''))
+        
         columns = ('n', 'x_n', 'g(x_n)', 'diferencia', 'error_abs', 'error_rel')
         tree = self._crear_tabla(columns)
         
@@ -592,10 +594,14 @@ class MetodosNumericosGUI:
                 f"{it['x_n']:.8f}", f"{it['g(x_n)']:.8f}",
                 f"{it['diferencia']:.8e}", f"{it['error_abs']:.8e}", f"{it['error_rel']:.8e}"
             ), tags=(tag,))
-            
-        self._mostrar_resumen(resultado, resultado.get('mensaje', ''))
 
     def mostrar_resultados_newton(self, resultado):
+        extra = ""
+        if 'convergencia_cuadratica' in resultado:
+            cc = resultado['convergencia_cuadratica']
+            extra = "✓ Convergencia cuadrática verificada" if cc.get('es_cuadratica', False) else "✗ No se observa convergencia cuadrática"
+        self._mostrar_resumen(resultado, extra)
+        
         columns = ('n', 'x_n', 'f(x_n)', "f'(x_n)", 'x_next', 'error_abs', 'error_rel')
         tree = self._crear_tabla(columns)
         
@@ -612,14 +618,10 @@ class MetodosNumericosGUI:
                 f"{it['x_n']:.10f}", f"{it['f(x_n)']:.8e}", f"{f_prime:.8f}",
                 f"{it['x_next']:.10f}", f"{it['error_abs']:.8e}", f"{it['error_rel']:.8e}"
             ), tags=(tag,))
-            
-        extra = ""
-        if 'convergencia_cuadratica' in resultado:
-            cc = resultado['convergencia_cuadratica']
-            extra = "✓ Convergencia cuadrática verificada" if cc.get('es_cuadratica', False) else "✗ No se observa convergencia cuadrática"
-        self._mostrar_resumen(resultado, extra)
 
     def mostrar_resultados_secante(self, resultado):
+        self._mostrar_resumen(resultado, f"Evaluaciones de función: {resultado.get('evaluaciones_funcion', 0)}")
+        
         columns = ('n', 'x_{n-1}', 'x_n', 'f(x_{n-1})', 'f(x_n)', 'x_{n+1}', 'error_abs', 'error_rel')
         tree = self._crear_tabla(columns)
         
@@ -636,8 +638,6 @@ class MetodosNumericosGUI:
                 f"{it['f(x_{n-1})']:.8e}", f"{it['f(x_n)']:.8e}",
                 f"{it['x_{n+1}']:.9f}", f"{it['error_abs']:.8e}", f"{it['error_rel']:.8e}"
             ), tags=(tag,))
-            
-        self._mostrar_resumen(resultado, f"Evaluaciones de función: {resultado.get('evaluaciones_funcion', 0)}")
 
     # --- GRÁFICAS (Ajustes estéticos) ---
     
