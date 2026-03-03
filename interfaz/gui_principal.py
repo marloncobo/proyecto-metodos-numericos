@@ -24,6 +24,7 @@ COLOR_TEXT = "#2c3e50"      # Gris oscuro para texto
 FONT_MAIN = ("Segoe UI", 10)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_HEADER = ("Segoe UI", 12, "bold")
+FONT_MATH = ("Consolas", 11, "bold") # Fuente para ecuaciones
 
 class MetodosNumericosGUI:
     def __init__(self, root):
@@ -125,42 +126,47 @@ class MetodosNumericosGUI:
         self.funciones_combo.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         self.funciones_combo.bind('<<ComboboxSelected>>', lambda e: self.mostrar_info_funcion())
         
+        # --- NUEVO: Label para mostrar la ecuación ---
+        self.lbl_ecuacion = ttk.Label(control_panel, text="", style="Card.TLabel", font=FONT_MATH, foreground=COLOR_ACCENT, wraplength=280)
+        self.lbl_ecuacion.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
+        # ---------------------------------------------
+
         # Campo para función personalizada
         self.lbl_personalizada = ttk.Label(control_panel, text="Ecuación f(x):", style="Card.TLabel")
         self.entry_personalizada = ttk.Entry(control_panel)
         
         # Separador
-        ttk.Separator(control_panel, orient='horizontal').grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=20)
+        ttk.Separator(control_panel, orient='horizontal').grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=20)
         
         # Frame para campos dinámicos (a, b, x0, etc.)
         self.campos_frame = ttk.Frame(control_panel, style="Card.TFrame")
-        self.campos_frame.grid(row=7, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+        self.campos_frame.grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
         
         # Parámetros generales
-        ttk.Label(control_panel, text="Parámetros de Ejecución:", style="Card.TLabel", font=FONT_BOLD).grid(row=8, column=0, columnspan=2, sticky=tk.W, pady=(15, 10))
+        ttk.Label(control_panel, text="Parámetros de Ejecución:", style="Card.TLabel", font=FONT_BOLD).grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(15, 10))
         
         # Tolerancia
-        ttk.Label(control_panel, text="Tolerancia:", style="Card.TLabel").grid(row=9, column=0, sticky=tk.W, pady=5)
+        ttk.Label(control_panel, text="Tolerancia:", style="Card.TLabel").grid(row=10, column=0, sticky=tk.W, pady=5)
         self.tolerancia_entry = ttk.Entry(control_panel, width=15)
-        self.tolerancia_entry.grid(row=9, column=1, sticky=tk.E, pady=5)
+        self.tolerancia_entry.grid(row=10, column=1, sticky=tk.E, pady=5)
         self.tolerancia_entry.insert(0, "1e-6")
         
         # Máx iteraciones
-        ttk.Label(control_panel, text="Máx iteraciones:", style="Card.TLabel").grid(row=10, column=0, sticky=tk.W, pady=5)
+        ttk.Label(control_panel, text="Máx iteraciones:", style="Card.TLabel").grid(row=11, column=0, sticky=tk.W, pady=5)
         self.max_iter_entry = ttk.Entry(control_panel, width=15)
-        self.max_iter_entry.grid(row=10, column=1, sticky=tk.E, pady=5)
+        self.max_iter_entry.grid(row=11, column=1, sticky=tk.E, pady=5)
         self.max_iter_entry.insert(0, "100")
         
         # Tipo de error
-        ttk.Label(control_panel, text="Tipo error:", style="Card.TLabel").grid(row=11, column=0, sticky=tk.W, pady=5)
+        ttk.Label(control_panel, text="Tipo error:", style="Card.TLabel").grid(row=12, column=0, sticky=tk.W, pady=5)
         self.error_var = tk.StringVar(value="absoluto")
         error_combo = ttk.Combobox(control_panel, textvariable=self.error_var,
                                   values=["absoluto", "relativo"], state="readonly", width=13)
-        error_combo.grid(row=11, column=1, sticky=tk.E, pady=5)
+        error_combo.grid(row=12, column=1, sticky=tk.E, pady=5)
         
         # Botones de Acción
         botones_frame = ttk.Frame(control_panel, style="Card.TFrame")
-        botones_frame.grid(row=12, column=0, columnspan=2, pady=30)
+        botones_frame.grid(row=13, column=0, columnspan=2, pady=30)
         
         ttk.Button(botones_frame, text="CALCULAR", style="Accent.TButton", command=self.calcular).pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
         ttk.Button(botones_frame, text="Limpiar", command=self.limpiar).pack(side=tk.LEFT, padx=5)
@@ -247,22 +253,21 @@ class MetodosNumericosGUI:
         seleccion = self.funcion_var.get()
         
         if seleccion == "Personalizada":
-            self.lbl_personalizada.grid(row=5, column=0, sticky=tk.W, pady=5)
-            self.entry_personalizada.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
-            messagebox.showinfo("Función Personalizada", 
-                              "Ingrese una función en términos de 'x'.\n"
-                              "Ejemplos:\n"
-                              "  x**2 - 4\n"
-                              "  sin(x) + x\n"
-                              "  exp(x) - 2*x")
+            self.lbl_personalizada.grid(row=6, column=0, sticky=tk.W, pady=5)
+            self.entry_personalizada.grid(row=6, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=5)
+            self.lbl_ecuacion.config(text="") # Limpiar label de ecuación
+            
+            # Mostrar ayuda solo la primera vez o si está vacío
+            if not self.entry_personalizada.get():
+                pass # Opcional: mostrar tooltip
         else:
             self.lbl_personalizada.grid_remove()
             self.entry_personalizada.grid_remove()
             
             if seleccion:
                 func_info = FUNCIONES[seleccion]
-                # Opcional: Mostrar info en un label en lugar de popup para ser menos intrusivo
-                pass 
+                # Actualizar el label con la descripción de la función
+                self.lbl_ecuacion.config(text=func_info['descripcion'])
         
         self.actualizar_campos_entrada()
     
