@@ -530,13 +530,35 @@ class MetodosNumericosGUI:
         conclusion = ""
         if resultado['convergio'] and resultado['raiz'] is not None:
             raiz = resultado['raiz']
-            conclusion = f"El método convergió exitosamente a la solución x ≈ {raiz:.6f}.\n\n"
-            conclusion += f"Esto significa que, bajo las condiciones dadas, el valor óptimo es {raiz:.6f}."
+            
+            # Generar conclusión específica según el ejercicio
+            nombre_func = self.funcion_var.get()
+            
+            if "Ej1" in nombre_func:
+                conclusion = f"El valor encontrado de λ ≈ {raiz:.6f} representa el factor de carga óptimo según el modelo matemático. En ese punto, el comportamiento del tiempo de búsqueda alcanza el equilibrio definido por la función, lo que permite estimar la configuración más eficiente del sistema de caché."
+            
+            elif "Ej2" in nombre_func:
+                conclusion = f"El valor encontrado x ≈ {raiz:.6f} representa el número óptimo de workers activos según el modelo de eficiencia. En ese punto, el sistema alcanza un equilibrio entre carga y capacidad de procesamiento."
+            
+            elif "Ej3" in nombre_func:
+                conclusion = f"El valor obtenido x ≈ {raiz:.6f} representa el número de meses necesarios para que la base de datos alcance el 80% de su capacidad según el modelo de crecimiento. Este resultado permite planificar ampliaciones o limpieza de datos."
+            
+            elif "Ej4" in nombre_func:
+                conclusion = f"El valor encontrado n ≈ {raiz:.6f} representa el número de threads donde, según el modelo, el beneficio del paralelismo se equilibra con el costo de sincronización. Este punto permite estimar una configuración eficiente del sistema paralelo."
+            
+            elif "Ej5" in nombre_func:
+                conclusion = f"El valor encontrado x ≈ {raiz:.6f} representa el número de miles de usuarios activos necesarios para que los ingresos igualen los costos de infraestructura. A partir de ese punto, la plataforma comienza a ser rentable."
+            
+            else:
+                # Caso genérico o personalizada
+                conclusion = f"El método convergió exitosamente a la solución x ≈ {raiz:.6f}.\n\n"
+                conclusion += f"Esto significa que, bajo las condiciones dadas, el valor que satisface la ecuación es {raiz:.6f}."
+                
         else:
             conclusion = "El método no logró converger a una solución válida dentro de los parámetros establecidos.\n"
             conclusion += "Se recomienda revisar los valores iniciales o aumentar el número de iteraciones."
             
-        txt_conclusion = tk.Text(container, height=4, wrap=tk.WORD, font=FONT_MAIN, 
+        txt_conclusion = tk.Text(container, height=6, wrap=tk.WORD, font=FONT_MAIN,
                                 bg=COLOR_BG, relief="flat", padx=10, pady=10)
         txt_conclusion.insert(tk.END, conclusion)
         txt_conclusion.config(state=tk.DISABLED)
