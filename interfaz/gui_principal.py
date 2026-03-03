@@ -4,7 +4,7 @@ Interfaz gráfica principal usando tkinter y matplotlib
 import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 import numpy as np
 
 from funciones.definiciones import FUNCIONES
@@ -24,7 +24,7 @@ COLOR_TEXT = "#2c3e50"      # Gris oscuro para texto
 FONT_MAIN = ("Segoe UI", 10)
 FONT_BOLD = ("Segoe UI", 10, "bold")
 FONT_HEADER = ("Segoe UI", 12, "bold")
-FONT_MATH = ("Consolas", 11, "bold") # Fuente para ecuaciones
+FONT_MATH = ("Consolas", 11, "bold")
 
 class MetodosNumericosGUI:
     def __init__(self, root):
@@ -126,10 +126,9 @@ class MetodosNumericosGUI:
         self.funciones_combo.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         self.funciones_combo.bind('<<ComboboxSelected>>', lambda e: self.mostrar_info_funcion())
         
-        # --- NUEVO: Label para mostrar la ecuación ---
+        # Label para mostrar la ecuación
         self.lbl_ecuacion = ttk.Label(control_panel, text="", style="Card.TLabel", font=FONT_MATH, foreground=COLOR_ACCENT, wraplength=280)
         self.lbl_ecuacion.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 15))
-        # ---------------------------------------------
 
         # Campo para función personalizada
         self.lbl_personalizada = ttk.Label(control_panel, text="Ecuación f(x):", style="Card.TLabel")
@@ -654,6 +653,48 @@ class MetodosNumericosGUI:
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
 
+    def _agregar_tooltip(self, fig, ax, artist, labels_func):
+        """
+        Agrega un tooltip interactivo a un elemento de la gráfica (scatter o line).
+        
+        Args:
+            fig: La figura de matplotlib.
+            ax: El eje donde está el artista.
+            artist: El objeto (PathCollection para scatter) que dispara el evento.
+            labels_func: Función que recibe el índice del punto y devuelve el texto a mostrar.
+        """
+        annot = ax.annotate("", xy=(0,0), xytext=(10,10), textcoords="offset points",
+                            bbox=dict(boxstyle="round", fc="w", ec="0.5", alpha=0.9),
+                            arrowprops=dict(arrowstyle="->"))
+        annot.set_visible(False)
+
+        def update_annot(ind):
+            # Obtener posición del punto
+            pos = artist.get_offsets()[ind["ind"][0]]
+            annot.xy = pos
+            
+            # Obtener texto usando la función proporcionada
+            idx = ind["ind"][0]
+            text = labels_func(idx)
+            
+            annot.set_text(text)
+            annot.get_bbox_patch().set_alpha(0.9)
+
+        def hover(event):
+            vis = annot.get_visible()
+            if event.inaxes == ax:
+                cont, ind = artist.contains(event)
+                if cont:
+                    update_annot(ind)
+                    annot.set_visible(True)
+                    fig.canvas.draw_idle()
+                else:
+                    if vis:
+                        annot.set_visible(False)
+                        fig.canvas.draw_idle()
+
+        fig.canvas.mpl_connect("motion_notify_event", hover)
+
     def graficar_biseccion(self, f, a, b, resultado):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5), dpi=100)
         self._configurar_grafica(fig, [ax1, ax2])
@@ -667,13 +708,23 @@ class MetodosNumericosGUI:
         
         xs = [it['c'] for it in resultado['iteraciones']]
         ys = [it['f(c)'] for it in resultado['iteraciones']]
-        ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        
+        # Tooltip para gráfica de función
+        self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {resultado['iteraciones'][i]['n']}\nx: {xs[i]:.6f}\ny: {ys[i]:.2e}")
         
         ax1.set_title('Convergencia de Raíz')
         ax1.legend()
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', marker='o', markersize=4)
+        # Usamos plot para la línea pero scatter invisible para el tooltip si queremos, 
+        # o simplemente scatter visible encima.
+        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-', linewidth=1)
+        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        
+        # Tooltip para gráfica de error
+        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+
         ax2.set_title('Evolución del Error')
         ax2.set_xlabel('Iteración')
         
@@ -693,12 +744,18 @@ class MetodosNumericosGUI:
         
         xs = [it['c'] for it in resultado['iteraciones']]
         ys = [f(xi) for xi in xs]
-        ax1.scatter(xs, ys, color='#e74c3c', s=20)
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20)
+        
+        self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {resultado['iteraciones'][i]['n']}\nx: {xs[i]:.6f}\ny: {ys[i]:.2e}")
         
         ax1.set_title('Falsa Posición')
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', marker='o')
+        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
+        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        
+        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        
         ax2.set_title('Error Absoluto')
         
         plt.tight_layout()
@@ -723,13 +780,20 @@ class MetodosNumericosGUI:
             for i in range(len(xs) - 1):
                 ax1.plot([xs[i], xs[i]], [xs[i], xs[i+1]], color='#e74c3c', alpha=0.4, linewidth=1)
                 ax1.plot([xs[i], xs[i+1]], [xs[i+1], xs[i+1]], color='#e74c3c', alpha=0.4, linewidth=1)
-        
+            
+            # Puntos para tooltip (solo los x_n sobre la curva g(x))
+            sc1 = ax1.scatter(xs[:-1], [g(xi) for xi in xs[:-1]], color='#e74c3c', s=20, zorder=5)
+            self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {i+1}\nx: {xs[i]:.6f}\ng(x): {g(xs[i]):.6f}")
+
         ax1.set_title('Diagrama de Telaraña')
         ax1.legend()
         
         if resultado['iteraciones']:
             errores = [it['error_abs'] for it in resultado['iteraciones']]
-            ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', marker='o')
+            ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
+            sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+            
             ax2.set_title('Error Absoluto')
         
         plt.tight_layout()
@@ -760,10 +824,19 @@ class MetodosNumericosGUI:
             y_tang = f_n + f_prime * (x_tang - x_n)
             ax1.plot(x_tang, y_tang, color='#95a5a6', linestyle='--', alpha=0.5)
             
+        # Puntos de iteración
+        xs = [it['x_n'] for it in iteraciones]
+        ys = [it['f(x_n)'] for it in iteraciones]
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {iteraciones[i]['n']}\nx: {xs[i]:.6f}\nf(x): {ys[i]:.2e}")
+
         ax1.set_title('Newton-Raphson')
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', marker='o')
+        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
+        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        
         ax2.set_title('Error Absoluto')
         
         plt.tight_layout()
@@ -784,7 +857,6 @@ class MetodosNumericosGUI:
         
         # Dibujar secantes
         iteraciones = resultado['iteraciones']
-        # Mostrar solo las últimas 5 para no saturar si hay muchas
         start_idx = max(0, len(iteraciones) - 5)
         
         for i in range(start_idx, len(iteraciones) - 1):
@@ -794,10 +866,7 @@ class MetodosNumericosGUI:
             f_prev = it['f(x_{n-1})']
             f_curr = it['f(x_n)']
             
-            # Recta secante que pasa por (x_prev, f_prev) y (x_curr, f_curr)
-            # Extendemos un poco la línea para visualizarla mejor
             x_sec = np.linspace(min(x_prev, x_curr) - 0.5, max(x_prev, x_curr) + 0.5, 10)
-            
             if abs(x_curr - x_prev) > 1e-10:
                 pendiente = (f_curr - f_prev) / (x_curr - x_prev)
                 y_sec = f_prev + pendiente * (x_sec - x_prev)
@@ -806,10 +875,19 @@ class MetodosNumericosGUI:
                 # Marcar los puntos usados para la secante
                 ax1.scatter([x_prev, x_curr], [f_prev, f_curr], color='#e74c3c', s=10, zorder=3)
 
+        # Puntos de iteración (nuevos x)
+        xs = [it['x_n'] for it in iteraciones]
+        ys = [it['f(x_n)'] for it in iteraciones]
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {iteraciones[i]['n']}\nx: {xs[i]:.6f}\nf(x): {ys[i]:.2e}")
+
         ax1.set_title('Método de la Secante')
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', marker='o')
+        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
+        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        
         ax2.set_title('Error Absoluto')
         
         plt.tight_layout()
@@ -819,8 +897,16 @@ class MetodosNumericosGUI:
         """Muestra la figura en el frame dado limpiando lo anterior"""
         for widget in parent_frame.winfo_children():
             widget.destroy()
+            
+        # Crear canvas
         canvas = FigureCanvasTkAgg(fig, master=parent_frame)
         canvas.draw()
+        
+        # Añadir barra de herramientas (Zoom, Pan, Save)
+        toolbar = NavigationToolbar2Tk(canvas, parent_frame)
+        toolbar.update()
+        
+        # Empaquetar
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def _crear_texto_con_scroll(self, parent, text_content):
