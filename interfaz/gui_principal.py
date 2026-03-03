@@ -652,6 +652,11 @@ class MetodosNumericosGUI:
             ax.grid(True, linestyle=':', alpha=0.6)
             ax.spines['top'].set_visible(False)
             ax.spines['right'].set_visible(False)
+            
+            # --- NUEVO: Ejes más marcados ---
+            ax.axhline(0, color='black', linewidth=1.5, alpha=0.8)
+            ax.axvline(0, color='black', linewidth=1.5, alpha=0.8)
+            # --------------------------------
 
     def _agregar_tooltip(self, fig, ax, artist, labels_func):
         """
@@ -694,17 +699,62 @@ class MetodosNumericosGUI:
                         fig.canvas.draw_idle()
 
         fig.canvas.mpl_connect("motion_notify_event", hover)
+        
+    def _graficar_error_log(self, fig, ax, errores, color='#27ae60', label=None, marker='o'):
+        """
+        Función auxiliar robusta para graficar errores en escala logarítmica.
+        Maneja automáticamente valores <= 0 reemplazándolos por epsilon.
+        """
+        if not errores:
+            return None
+            
+        # Limpieza robusta de datos: reemplazar <= 0 por 1e-20
+        errores_limpios = [max(float(e), 1e-20) if not np.isnan(e) and not np.isinf(e) else 1e-20 for e in errores]
+        iteraciones = range(1, len(errores_limpios) + 1)
+        
+        # Graficar línea
+        ax.semilogy(iteraciones, errores_limpios, color=color, linestyle='-', linewidth=1, label=label)
+        
+        # Graficar puntos (para tooltips)
+        sc = ax.scatter(iteraciones, errores_limpios, color=color, s=15, marker=marker)
+        
+        return sc
 
     def graficar_biseccion(self, f, a, b, resultado):
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.5), dpi=100)
         self._configurar_grafica(fig, [ax1, ax2])
         
+        # Filtrar dominio para evitar errores de logaritmo en la gráfica de función
         x = np.linspace(a - 0.5, b + 0.5, 1000)
-        y = [f(xi) for xi in x]
+        y = []
+        x_validos = []
+        for xi in x:
+            try:
+                val = f(xi)
+                if not np.isnan(val) and not np.isinf(val):
+                    y.append(val)
+                    x_validos.append(xi)
+            except:
+                pass
         
-        ax1.plot(x, y, color=COLOR_ACCENT, label='f(x)', linewidth=2)
-        ax1.axhline(y=0, color='k', linestyle='-', linewidth=0.8)
-        ax1.axvline(x=resultado['raiz'], color='#e74c3c', linestyle='--', label='Raíz')
+        ax1.plot(x_validos, y, color=COLOR_ACCENT, label='f(x)', linewidth=2)
+        
+        # --- NUEVO: Resaltado de Raíz ---
+        ax1.plot(resultado['raiz'], 0, 'o', color='#f1c40f', markersize=10, markeredgecolor='black', zorder=10, label='Raíz')
+        ax1.annotate('Raíz', xy=(resultado['raiz'], 0), xytext=(10, 10), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=.2'))
+        # --------------------------------
+        
+        # --- NUEVO: Líneas de Iteración (Intervalos) ---
+        # Mostramos solo las primeras 5 y la última para no saturar
+        iters_to_show = resultado['iteraciones'][:5]
+        if len(resultado['iteraciones']) > 5:
+            iters_to_show.append(resultado['iteraciones'][-1])
+            
+        for it in iters_to_show:
+            ax1.axvline(x=it['a'], color='gray', linestyle=':', alpha=0.3)
+            ax1.axvline(x=it['b'], color='gray', linestyle=':', alpha=0.3)
+        # -----------------------------------------------
         
         xs = [it['c'] for it in resultado['iteraciones']]
         ys = [it['f(c)'] for it in resultado['iteraciones']]
@@ -717,13 +767,11 @@ class MetodosNumericosGUI:
         ax1.legend()
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        # Usamos plot para la línea pero scatter invisible para el tooltip si queremos, 
-        # o simplemente scatter visible encima.
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-', linewidth=1)
-        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        sc2 = self._graficar_error_log(fig, ax2, errores)
         
         # Tooltip para gráfica de error
-        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        if sc2:
+            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
 
         ax2.set_title('Evolución del Error')
         ax2.set_xlabel('Iteración')
@@ -738,23 +786,35 @@ class MetodosNumericosGUI:
         x = np.linspace(a - 0.5, b + 0.5, 1000)
         y = [f(xi) for xi in x]
         
-        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2)
-        ax1.axhline(0, color='k', linewidth=0.8)
-        ax1.axvline(resultado['raiz'], color='#e74c3c', linestyle='--')
+        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2, label='f(x)')
+        
+        # --- NUEVO: Resaltado de Raíz ---
+        ax1.plot(resultado['raiz'], 0, 'o', color='#f1c40f', markersize=10, markeredgecolor='black', zorder=10, label='Raíz')
+        ax1.annotate('Raíz', xy=(resultado['raiz'], 0), xytext=(10, 10), textcoords='offset points',
+                     arrowprops=dict(arrowstyle='->', connectionstyle='arc3,rad=.2'))
+        # --------------------------------
+        
+        # --- NUEVO: Líneas de Iteración (Cuerdas) ---
+        # Mostrar TODAS las iteraciones pero muy tenues
+        for it in resultado['iteraciones']:
+            # Línea entre (a, f(a)) y (b, f(b))
+            ax1.plot([it['a'], it['b']], [it['f(a)'], it['f(b)']], color='gray', linestyle='--', alpha=0.2)
+        # --------------------------------------------
         
         xs = [it['c'] for it in resultado['iteraciones']]
         ys = [f(xi) for xi in xs]
-        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20)
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, label='Iteraciones')
         
         self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {resultado['iteraciones'][i]['n']}\nx: {xs[i]:.6f}\ny: {ys[i]:.2e}")
         
         ax1.set_title('Falsa Posición')
+        ax1.legend()
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
-        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
+        sc2 = self._graficar_error_log(fig, ax2, errores)
         
-        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        if sc2:
+            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
         
         ax2.set_title('Error Absoluto')
         
@@ -774,6 +834,11 @@ class MetodosNumericosGUI:
         ax1.plot(x, x, 'k--', label='y = x', alpha=0.5)
         ax1.plot(x, y_g, color=COLOR_ACCENT, label='y = g(x)', linewidth=2)
         
+        # --- NUEVO: Resaltado de Raíz ---
+        if resultado['raiz']:
+            ax1.plot(resultado['raiz'], resultado['raiz'], 'o', color='#f1c40f', markersize=10, markeredgecolor='black', zorder=10, label='Raíz')
+        # --------------------------------
+        
         if resultado['iteraciones']:
             xs = [it['x_n'] for it in resultado['iteraciones']]
             xs.append(resultado['iteraciones'][-1]['g(x_n)'])
@@ -782,7 +847,7 @@ class MetodosNumericosGUI:
                 ax1.plot([xs[i], xs[i+1]], [xs[i+1], xs[i+1]], color='#e74c3c', alpha=0.4, linewidth=1)
             
             # Puntos para tooltip (solo los x_n sobre la curva g(x))
-            sc1 = ax1.scatter(xs[:-1], [g(xi) for xi in xs[:-1]], color='#e74c3c', s=20, zorder=5)
+            sc1 = ax1.scatter(xs[:-1], [g(xi) for xi in xs[:-1]], color='#e74c3c', s=20, zorder=5, label='Iteraciones')
             self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {i+1}\nx: {xs[i]:.6f}\ng(x): {g(xs[i]):.6f}")
 
         ax1.set_title('Diagrama de Telaraña')
@@ -790,9 +855,9 @@ class MetodosNumericosGUI:
         
         if resultado['iteraciones']:
             errores = [it['error_abs'] for it in resultado['iteraciones']]
-            ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
-            sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
-            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+            sc2 = self._graficar_error_log(fig, ax2, errores)
+            if sc2:
+                self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
             
             ax2.set_title('Error Absoluto')
         
@@ -809,8 +874,12 @@ class MetodosNumericosGUI:
         x = np.linspace(x_min, x_max, 1000)
         y = [f(xi) for xi in x]
         
-        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2)
-        ax1.axhline(0, color='k', linewidth=0.8)
+        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2, label='f(x)')
+        
+        # --- NUEVO: Resaltado de Raíz ---
+        if resultado['raiz']:
+            ax1.plot(resultado['raiz'], 0, 'o', color='#f1c40f', markersize=10, markeredgecolor='black', zorder=10, label='Raíz')
+        # --------------------------------
         
         # Tangentes (solo últimas 5 para no saturar)
         iteraciones = resultado['iteraciones']
@@ -827,15 +896,16 @@ class MetodosNumericosGUI:
         # Puntos de iteración
         xs = [it['x_n'] for it in iteraciones]
         ys = [it['f(x_n)'] for it in iteraciones]
-        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5, label='Iteraciones')
         self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {iteraciones[i]['n']}\nx: {xs[i]:.6f}\nf(x): {ys[i]:.2e}")
 
         ax1.set_title('Newton-Raphson')
+        ax1.legend()
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
-        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
-        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        sc2 = self._graficar_error_log(fig, ax2, errores)
+        if sc2:
+            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
         
         ax2.set_title('Error Absoluto')
         
@@ -852,11 +922,16 @@ class MetodosNumericosGUI:
         x = np.linspace(x_min, x_max, 1000)
         y = [f(xi) for xi in x]
         
-        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2)
-        ax1.axhline(0, color='k', linewidth=0.8)
+        ax1.plot(x, y, color=COLOR_ACCENT, linewidth=2, label='f(x)')
+        
+        # --- NUEVO: Resaltado de Raíz ---
+        if resultado['raiz']:
+            ax1.plot(resultado['raiz'], 0, 'o', color='#f1c40f', markersize=10, markeredgecolor='black', zorder=10, label='Raíz')
+        # --------------------------------
         
         # Dibujar secantes
         iteraciones = resultado['iteraciones']
+        # Mostrar solo las últimas 5 para no saturar si hay muchas
         start_idx = max(0, len(iteraciones) - 5)
         
         for i in range(start_idx, len(iteraciones) - 1):
@@ -866,7 +941,10 @@ class MetodosNumericosGUI:
             f_prev = it['f(x_{n-1})']
             f_curr = it['f(x_n)']
             
+            # Recta secante que pasa por (x_prev, f_prev) y (x_curr, f_curr)
+            # Extendemos un poco la línea para visualizarla mejor
             x_sec = np.linspace(min(x_prev, x_curr) - 0.5, max(x_prev, x_curr) + 0.5, 10)
+            
             if abs(x_curr - x_prev) > 1e-10:
                 pendiente = (f_curr - f_prev) / (x_curr - x_prev)
                 y_sec = f_prev + pendiente * (x_sec - x_prev)
@@ -878,15 +956,16 @@ class MetodosNumericosGUI:
         # Puntos de iteración (nuevos x)
         xs = [it['x_n'] for it in iteraciones]
         ys = [it['f(x_n)'] for it in iteraciones]
-        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5)
+        sc1 = ax1.scatter(xs, ys, color='#e74c3c', s=20, zorder=5, label='Iteraciones')
         self._agregar_tooltip(fig, ax1, sc1, lambda i: f"Iter: {iteraciones[i]['n']}\nx: {xs[i]:.6f}\nf(x): {ys[i]:.2e}")
 
         ax1.set_title('Método de la Secante')
+        ax1.legend()
         
         errores = [it['error_abs'] for it in resultado['iteraciones']]
-        ax2.semilogy(range(1, len(errores) + 1), errores, color='#27ae60', linestyle='-')
-        sc2 = ax2.scatter(range(1, len(errores) + 1), errores, color='#27ae60', s=15)
-        self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
+        sc2 = self._graficar_error_log(fig, ax2, errores)
+        if sc2:
+            self._agregar_tooltip(fig, ax2, sc2, lambda i: f"Iter: {i+1}\nError: {errores[i]:.2e}")
         
         ax2.set_title('Error Absoluto')
         
@@ -897,8 +976,6 @@ class MetodosNumericosGUI:
         """Muestra la figura en el frame dado limpiando lo anterior"""
         for widget in parent_frame.winfo_children():
             widget.destroy()
-            
-        # Crear canvas
         canvas = FigureCanvasTkAgg(fig, master=parent_frame)
         canvas.draw()
         
@@ -906,7 +983,6 @@ class MetodosNumericosGUI:
         toolbar = NavigationToolbar2Tk(canvas, parent_frame)
         toolbar.update()
         
-        # Empaquetar
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def _crear_texto_con_scroll(self, parent, text_content):
@@ -980,8 +1056,9 @@ class MetodosNumericosGUI:
         errores_bisec = [it['error_abs'] for it in bisec['iteraciones']]
         errores_falsa = [it['error_abs'] for it in falsa['iteraciones']]
         
-        ax.semilogy(range(1, len(errores_bisec) + 1), errores_bisec, label='Bisección', marker='o')
-        ax.semilogy(range(1, len(errores_falsa) + 1), errores_falsa, label='Falsa Posición', marker='s')
+        self._graficar_error_log(fig, ax, errores_bisec, color='blue', label='Bisección')
+        self._graficar_error_log(fig, ax, errores_falsa, color='red', label='Falsa Posición', marker='s')
+        
         ax.legend()
         ax.set_title('Velocidad de Convergencia')
         
@@ -1038,8 +1115,9 @@ class MetodosNumericosGUI:
         errores_newton = [it['error_abs'] for it in newton['iteraciones']]
         errores_secante = [it['error_abs'] for it in sec['iteraciones']]
         
-        ax.semilogy(range(1, len(errores_newton) + 1), errores_newton, label='Newton', marker='o')
-        ax.semilogy(range(1, len(errores_secante) + 1), errores_secante, label='Secante', marker='s')
+        self._graficar_error_log(fig, ax, errores_newton, color='blue', label='Newton')
+        self._graficar_error_log(fig, ax, errores_secante, color='red', label='Secante', marker='s')
+        
         ax.legend()
         ax.set_title('Convergencia del Error')
         
@@ -1097,7 +1175,7 @@ class MetodosNumericosGUI:
             
             if res['iteraciones']:
                 errores = [it['error_abs'] for it in res['iteraciones']]
-                ax.semilogy(range(1, len(errores) + 1), errores, label=f'x0={x0}', marker='o', color=colores[i % len(colores)])
+                self._graficar_error_log(fig, ax, errores, color=colores[i % len(colores)], label=f'x0={x0}')
 
         ax.legend()
         ax.set_title('Convergencia según Valor Inicial')
@@ -1107,7 +1185,7 @@ class MetodosNumericosGUI:
         canvas = FigureCanvasTkAgg(fig, master=self.comparacion_frame)
         canvas.draw()
         canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True, pady=10)
-
+        
     def comparar_newton_iniciales_ui(self, f, f_derivada, tol):
         """Realiza el análisis de sensibilidad para Newton-Raphson"""
         valores_iniciales = [1.0, 2.0, 3.0, 5.0]
@@ -1170,7 +1248,7 @@ class MetodosNumericosGUI:
             
             if res['iteraciones']:
                 errores = [it['error_abs'] for it in res['iteraciones']]
-                ax.semilogy(range(1, len(errores) + 1), errores, label=f'x0={x0}', marker='o', color=colores[i % len(colores)])
+                self._graficar_error_log(fig, ax, errores, color=colores[i % len(colores)], label=f'x0={x0}')
 
         ax.legend()
         ax.set_title('Convergencia según Valor Inicial')
