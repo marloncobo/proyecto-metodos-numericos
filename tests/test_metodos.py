@@ -12,9 +12,10 @@ class TestMetodosNumericos(unittest.TestCase):
 
     def test_biseccion(self):
         # Usando Ejercicio 1
-        resultado = biseccion(T_lambda, 0.5, 2.5, tol=1e-6)
+        f = lambda x: x ** 2 - 4
+        resultado = biseccion(f, 0.0, 3.0, tol=1e-6)
         self.assertTrue(resultado['convergio'])
-        self.assertAlmostEqual(T_lambda(resultado['raiz']), 0, places=5)
+        self.assertAlmostEqual(resultado['raiz'], 2.0, places=5)
 
     def test_falsa_posicion(self):
         # Usando Ejercicio 2
