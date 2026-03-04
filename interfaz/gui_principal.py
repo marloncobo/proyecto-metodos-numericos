@@ -1038,16 +1038,27 @@ class MetodosNumericosGUI:
         analisis_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=10)
         
         comp = comparacion['comparacion']
-        metodo_rapido = "Falsa Posición" if comp['metodo_mas_rapido'] == 'falsa_posicion' else "Bisección"
-        iter_diff = abs(comp['iteraciones_biseccion'] - comp['iteraciones_falsa'])
+        iter_bis = comp['iteraciones_biseccion']
+        iter_falsa = comp['iteraciones_falsa']
+        iter_diff = abs(iter_bis - iter_falsa)
         
-        texto_analisis = (
-            f"El método de {metodo_rapido} convergió más rápido.\n\n"
-            f"Diferencia en iteraciones: {iter_diff}\n"
-            "Análisis: El método de Falsa Posición suele ser más rápido que Bisección porque utiliza la magnitud de los valores de la función "
-            "para estimar la raíz (interpolación lineal), en lugar de simplemente dividir el intervalo a la mitad. "
-            "Esto le permite acercarse a la raíz con pasos más grandes cuando la función es suave."
-        )
+        if iter_falsa < iter_bis:
+            resumen = "El método de Falsa Posición convergió con menos iteraciones."
+            analisis = (
+                "Análisis: El método de Falsa Posición aprovecha la magnitud de f(x) en los extremos para interpolar la raíz. "
+                "En funciones suaves, esto permite acercarse más rápido a la solución que dividir el intervalo a la mitad (Bisección)."
+            )
+        elif iter_bis < iter_falsa:
+            resumen = "El método de Bisección convergió con menos iteraciones."
+            analisis = (
+                "Análisis: Bisección fue más eficiente en este caso. Esto ocurre cuando la función presenta una curvatura tal que "
+                "la interpolación lineal (Falsa Posición) avanza muy lentamente por uno de los extremos, mientras que Bisección reduce el intervalo consistentemente."
+            )
+        else:
+            resumen = "Ambos métodos convergieron en el mismo número de iteraciones."
+            analisis = "Análisis: El rendimiento en iteraciones fue idéntico para la tolerancia y función dadas."
+        
+        texto_analisis = f"{resumen}\n\nDiferencia en iteraciones: {iter_diff}\n\n{analisis}"
         
         self._crear_texto_con_scroll(analisis_frame, texto_analisis)
 
