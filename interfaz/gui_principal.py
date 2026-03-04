@@ -1053,7 +1053,7 @@ class MetodosNumericosGUI:
 
         # Tabla
         columns = ('Método', 'Iteraciones', 'Raíz Encontrada', 'Tiempo (s)', 'Error final')
-        tree = self._crear_tabla(columns) # Usar helper pero necesitamos re-packearlo en este frame
+
         # Nota: _crear_tabla usa self.resultados_frame por defecto, así que mejor creamos uno local aquí
         
         frame_tabla = ttk.Frame(self.comparacion_frame, style="Card.TFrame")
